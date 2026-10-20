@@ -104,7 +104,7 @@ function build(date, roll, total, wk){
   const d = durations(total - wk, r);
   const cats = categories(d.length, r);
   const plan = cats.map((c,i) => ({...c, m:d[i]}));
-  if(wk > 0) plan.splice(Math.floor(r()*(plan.length+1)), 0, {...WK, m:wk});
+  if(wk > 0) plan.unshift({...WK, m:wk});
   return plan;
 }
 
