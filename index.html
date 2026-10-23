@@ -25,7 +25,7 @@ h1{font-size:1.4rem;margin:0 0 4px}
 .date{color:var(--mut);margin:0 0 20px}
 .ctl{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:20px}
 label{font-size:.85rem;color:var(--mut);display:flex;flex-direction:column;gap:4px}
-input{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);width:96px;box-sizing:border-box}
+input,select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);width:96px;box-sizing:border-box}
 button{font:inherit;padding:8px 16px;border:0;border-radius:6px;background:var(--fg);color:var(--bg);cursor:pointer}
 ol{list-style:none;padding:0;margin:0}
 li{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--c);border-radius:6px;padding:10px 12px;margin-bottom:8px}
@@ -46,6 +46,7 @@ li.next .play{outline:2px solid var(--fg);outline-offset:2px}
 .clock{font-size:2.4rem;font-variant-numeric:tabular-nums;line-height:1.2;margin:4px 0 8px}
 .tb{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .timer input[type=range]{width:160px}
+.timer select{width:auto}
 iframe#yt{display:block;margin-top:10px;width:100%;max-width:356px;height:200px;border:0;border-radius:6px}
 </style>
 </head>
@@ -79,8 +80,11 @@ iframe#yt{display:block;margin-top:10px;width:100%;max-width:356px;height:200px;
     <button id="tSkip" class="ghost" hidden>Passer la pause</button>
     <button id="tStop" class="ghost" disabled>Arrêter</button>
   </div>
-  <label>Volume lofi <input type="range" id="vol" min="0" max="100" value="50"></label>
-  <p class="ph" id="ytErr" hidden>Musique indisponible ici. <a href="https://www.youtube.com/watch?v=0sfDth4lMLc" target="_blank" rel="noopener">Ouvrir la musique lofi dans un onglet</a></p>
+  <div class="tb">
+    <label>Musique <select id="music"></select></label>
+    <label>Volume <input type="range" id="vol" min="0" max="100" value="50"></label>
+  </div>
+  <p class="ph" id="ytErr" hidden>Musique indisponible ici. <a id="ytLink" href="#" target="_blank" rel="noopener">Ouvrir la musique dans un onglet</a></p>
   <iframe id="yt" title="Musique lofi" allow="autoplay; encrypted-media"></iframe>
 </section>
 
@@ -189,9 +193,17 @@ function render(){
 }
 
 // ---- Minuteur + musique lofi ----
-// Direct « lofi hip hop radio » de Lofi Girl (vérifié le 2026-10-23).
-// Si la chaîne relance son direct, remplacer l'identifiant : youtube.com/@LofiGirl/live
-const LOFI = "https://www.youtube.com/embed/0sfDth4lMLc?enablejsapi=1&playsinline=1&rel=0";
+// Radios en direct de Lofi Girl (vérifiées le 2026-10-23).
+// Si l'une s'arrête, reprendre son identifiant sur youtube.com/@LofiGirl/streams
+const RADIOS = [
+  {id:"rFZHOHl-L8A", n:"Lofi hip hop"},
+  {id:"1Tl2FtV06qo", n:"Lofi asiatique"},
+  {id:"E2vONfzoyRI", n:"Jazz lofi"},
+  {id:"N0snMcR6aaA", n:"Piano calme"},
+  {id:"E_XmwjgRLz8", n:"Guitare calme"},
+  {id:"jXAEIWcGXwE", n:"Musique classique"}
+];
+const radio = () => RADIOS.find(x => x.id === $("music").value) || RADIOS[0];
 let yt = null, ac = null;
 const T = {i:-1, phase:"idle", end:0, left:0, paused:false, next:-1, block:null};
 
@@ -285,7 +297,15 @@ $("tToggle").onclick = () => {
 $("tSkip").onclick = () => { T.end = Date.now(); };
 $("tStop").onclick = stop;
 $("vol").addEventListener("input", e => { try{ yt && yt.setVolume(+e.target.value); }catch(err){} });
-$("yt").src = LOFI + (location.origin.startsWith("http") ? "&origin=" + encodeURIComponent(location.origin) : "");
+$("music").innerHTML = RADIOS.map(x => `<option value="${x.id}">${x.n}</option>`).join("");
+$("music").value = get("matinee-radio") || RADIOS[0].id;
+$("ytLink").href = "https://www.youtube.com/watch?v=" + radio().id;
+$("music").addEventListener("change", () => {
+  set("matinee-radio", radio().id);
+  $("ytLink").href = "https://www.youtube.com/watch?v=" + radio().id;
+  try{ if(yt && yt.loadVideoById) (T.phase === "work" && !T.paused) ? yt.loadVideoById(radio().id) : yt.cueVideoById(radio().id); }catch(e){}
+});
+$("yt").src = "https://www.youtube.com/embed/" + radio().id + "?enablejsapi=1&playsinline=1&rel=0" + (location.origin.startsWith("http") ? "&origin=" + encodeURIComponent(location.origin) : "");
 { const sc = document.createElement("script"); sc.src = "https://www.youtube.com/iframe_api"; document.head.appendChild(sc); }
 
 $("cats").innerHTML = [WK, ...CAT].map(c => `<li style="--c:var(--${c.k})"><span class="t">${c.t}</span>${c.n}</li>`).join("");
