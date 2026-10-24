@@ -39,6 +39,8 @@ li.pause .n{font-weight:400}
 li.on{outline:2px solid var(--c)}
 li.next .play{outline:2px solid var(--fg);outline-offset:2px}
 .play{flex:none;width:34px;height:34px;padding:0;border-radius:50%;font-size:.8rem}
+li.pause .play{width:26px;height:26px;font-size:.65rem}
+li.pause.on{outline-color:var(--mut)}
 .ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
 .timer{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:12px;margin-bottom:20px}
 .timer .ph{font-size:.85rem;color:var(--mut)}
@@ -184,7 +186,7 @@ function render(){
   PLAN = build(DATE, roll, total, wk, pause);
   $("plan").innerHTML = PLAN.map((b,i) => {
     let li = "";
-    if(i > 0 && pause > 0){ li += `<li class="pause"><span class="h">${hm(t)}</span><span class="n">Pause</span><span class="d">${pause} min</span></li>`; t += pause; }
+    if(i > 0 && pause > 0){ li += `<li class="pause"><span class="h">${hm(t)}</span><span class="n">Pause</span><span class="d">${pause} min</span><button class="play" data-p="${i}" aria-label="Lancer la pause">▶</button></li>`; t += pause; }
     li += `<li data-i="${i}" style="--c:var(--${b.k})"><span class="h">${hm(t)}</span><span class="n"><span class="t">${b.t}</span>${b.n}</span><span class="d">${b.m} min</span><button class="play" data-i="${i}" aria-label="Lancer ${b.n}">▶</button></li>`;
     t += b.m; return li;
   }).join("");
@@ -235,6 +237,10 @@ function mark(){
     li.classList.toggle("on", T.phase === "work" && i === T.i);
     li.classList.toggle("next", T.phase !== "work" && i === T.next);
   });
+  // Ligne de pause d'index p = pause placée avant le bloc p
+  document.querySelectorAll("#plan li[data-p]").forEach(li => {
+    li.classList.toggle("on", T.phase === "break" && +li.dataset.p === T.next);
+  });
 }
 
 function play(i){
@@ -243,6 +249,16 @@ function play(i){
   T.i = i; T.block = b; T.phase = "work"; T.paused = false; T.next = -1;
   T.end = Date.now() + b.m*60000;
   music(true); show(); mark();
+}
+
+// Lance à la main la pause placée avant le bloc i (sans musique, comme la pause auto)
+function playBreak(i){
+  const pause = Math.max(0, parseInt($("pause").value,10) || 0);
+  if(!PLAN[i] || pause <= 0) return;
+  if(ac && ac.state === "suspended") ac.resume();
+  music(false);
+  Object.assign(T, {i: i-1, block: PLAN[i-1], phase: "break", paused: false, next: i, end: Date.now() + pause*60000});
+  show(); mark();
 }
 
 function finish(){
@@ -288,7 +304,7 @@ setInterval(() => {
   }
 }, 250);
 
-$("plan").addEventListener("click", e => { const btn = e.target.closest(".play"); if(btn) play(+btn.dataset.i); });
+$("plan").addEventListener("click", e => { const btn = e.target.closest(".play"); if(!btn) return; btn.dataset.p != null ? playBreak(+btn.dataset.p) : play(+btn.dataset.i); });
 $("tToggle").onclick = () => {
   if(T.paused){ T.end = Date.now() + T.left; T.paused = false; if(T.phase === "work") music(true); }
   else { T.left = T.end - Date.now(); T.paused = true; music(false); }
